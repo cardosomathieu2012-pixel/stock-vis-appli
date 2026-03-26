@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2196f3">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion de stock de vis</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+    }
+
+    .page {
+      display: none;
+      padding: 20px;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    /* MENU */
+    .menu {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+    }
+
+    button {
+      padding: 20px 30px;
+      font-size: 22px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+
+    .plus { background: #4caf50; color: white; }
+    .minus { background: #f44336; color: white; }
+    .stock { background: #2196f3; color: white; }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .back {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      cursor: pointer;
+    }
+
+    /* FORM */
+    form {
+      max-width: 400px;
+      margin: 30px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    input {
+      padding: 12px;
+      font-size: 16px;
+    }
+
+    /* MESSAGE */
+    .message {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4caf50;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    /* STOCK */
+    .stock-item {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    @media (max-width: 600px) {
+      .menu { flex-direction: column; }
+    }
+  </style>
+</head>
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+<body>
+
+<div class="message" id="message"></div>
+
+<!-- MENU -->
+<div class="page active" id="menu">
+  <div class="menu">
+    <button class="minus" onclick="openPage('remove')">-</button>
+    <button class="stock" onclick="openPage('stock')">Stock</button>
+    <button class="plus" onclick="openPage('add')">+</button>
+  </div>
+</div>
+
+<!-- AJOUT -->
+<div class="page" id="add">
+  <div class="header">
+    <div class="back" onclick="openPage('menu')">←</div>
+  </div>
+
+  <h2>Ajouter des vis</h2>
+  <form onsubmit="addVis(event)">
+    <input id="addName" placeholder="Nom de la vis" required>
+    <input id="addSize" placeholder="Taille" required>
+    <input id="addQty" type="number" placeholder="Quantité" required>
+    <button type="submit">Ajouter</button>
+  </form>
+</div>
+
+<!-- RETRAIT -->
+<div class="page" id="remove">
+  <div class="header">
+    <div class="back" onclick="openPage('menu')">←</div>
+  </div>
+
+  <h2>Retirer des vis</h2>
+  <form onsubmit="removeVis(event)">
+    <input id="removeName" placeholder="Nom de la vis" required>
+    <input id="removeSize" placeholder="Taille" required>
+    <input id="removeQty" type="number" placeholder="Quantité" required>
+    <button type="submit">Retirer</button>
+  </form>
+</div>
+
+<!-- STOCK -->
+<div class="page" id="stock">
+  <div class="header">
+    <div class="back" onclick="openPage('menu')">←</div>
+  </div>
+
+  <h2>Stock</h2>
+  <h3 id="total"></h3>
+  <div id="stockList"></div>
+</div>
+
+<script>
+  let stock = JSON.parse(localStorage.getItem('stock')) || {};
+
+  function openPage(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+
+    if (id === 'menu') {
+      document.querySelectorAll('form').forEach(f => f.reset());
+    }
+
+    if (id === 'stock') renderStock();
+  }
+
+  function showMessage(text) {
+    const m = document.getElementById('message');
+    m.textContent = text;
+    m.style.display = 'block';
+    setTimeout(() => m.style.display = 'none', 1000);
+  }
+
+  function addVis(e) {
+    e.preventDefault();
+
+    const name = addName.value;
+    const size = addSize.value;
+    const qty = parseInt(addQty.value);
+
+    if (!stock[name]) stock[name] = {};
+    if (!stock[name][size]) stock[name][size] = 0;
+
+    stock[name][size] += qty;
+    localStorage.setItem('stock', JSON.stringify(stock));
+
+    showMessage('Vous avez bien ajouté vos vis');
+    openPage('menu');
+  }
+
+  function removeVis(e) {
+    e.preventDefault();
+
+    const name = removeName.value;
+    const size = removeSize.value;
+    const qty = parseInt(removeQty.value);
+
+    if (!stock[name] || !stock[name][size]) {
+      alert('Stock insuffisant');
+      return;
+    }
+
+    stock[name][size] = Math.max(0, stock[name][size] - qty);
+    localStorage.setItem('stock', JSON.stringify(stock));
+
+    showMessage('Vous avez bien retiré vos vis');
+    openPage('menu');
+  }
+
+  function renderStock() {
+    const list = document.getElementById('stockList');
+    const totalEl = document.getElementById('total');
+    list.innerHTML = '';
+
+    let total = 0;
+    for (let n in stock) {
+      for (let s in stock[n]) total += stock[n][s];
+    }
+    totalEl.textContent = 'Nombre total de vis : ' + total;
+
+    for (let n in stock) {
+      const div = document.createElement('div');
+      div.className = 'stock-item';
+      div.textContent = n;
+      div.onclick = () => {
+        let txt = '';
+        for (let s in stock[n]) txt += s + ' : ' + stock[n][s] + ' vis\n';
+        alert(txt);
+      };
+      list.appendChild(div);
+    }
+  }
+</script>
+
+</body>
+</html>
